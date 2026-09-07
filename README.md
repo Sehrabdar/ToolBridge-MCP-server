@@ -1,17 +1,15 @@
-# ToolBridge — Secure Multi-Tool MCP Server
+# ToolBridge — Secure MCP Server for Authenticated Tool Execution
 
 > **Streamable HTTP is the production transport; stdio is used only for local development and rapid iteration.**
 
-ToolBridge is a production-oriented MCP (Model Context Protocol) infrastructure project that exposes real external tools to an autonomous AI agent while enforcing per-user authentication, per-user authorization, secure credential handling, tool-level permissions, audit logging, failure handling, agent verification, and observability.
+ToolBridge is a production-grade MCP (Model Context Protocol) server that exposes authenticated, authorized external tools to any MCP-compatible client. It enforces per-user authentication, per-user authorization, secure credential handling, tool-level permissions, audit logging, failure handling, and observability. MCP-compatible AI agents and clients connect to ToolBridge to access its tools — the agent/client itself is not part of this project.
 
 ---
 
 ## Architecture
 
 ```
-User
-  ↓
-LangGraph Agent
+MCP-compatible Client or AI Agent (external — not part of this project)
   ↓
 MCP (Streamable HTTP — production | stdio — local dev)
   ↓
@@ -47,10 +45,8 @@ The server combines two concerns, kept deliberately separate:
 | Phase 5 | Audit Logging | 🔜 Planned |
 | Phase 6 | GitHub OAuth & JWT Session Auth | 🔜 Planned |
 | Phase 7 | Policy Engine & Per-Tool Authorization | 🔜 Planned |
-| Phase 8 | LangGraph Agent | 🔜 Planned |
-| Phase 9 | Failure Handling & Retry Engine | 🔜 Planned |
-| Phase 10 | Agent Verification | 🔜 Planned |
-| Phase 11 | Evaluation Framework | 🔜 Planned |
+| Phase 8 | Failure Handling & Retry Engine | 🔜 Planned |
+| Phase 9 | Security Hardening | 🔜 Planned |
 
 ---
 
@@ -80,8 +76,6 @@ The server combines two concerns, kept deliberately separate:
 | Technology | Purpose | Phase |
 |---|---|---|
 | **Official Python MCP SDK** (`mcp`) | MCP server primitives, tool registration, protocol handling | Phase 2 |
-| **LangGraph** | Autonomous agent graph (Planner → Tool Executor → Verifier) | Phase 8 |
-| **Anthropic Claude** | Primary LLM for the agent | Phase 8 |
 | **GitHub REST API** | External tool target (`search_repositories`, `list_issues`, `get_file_contents`) | Phase 4 |
 | **GitHub OAuth** | User identity via GitHub authorization | Phase 6 |
 | **JWT** | Short-lived session tokens for MCP requests | Phase 6 |
@@ -222,7 +216,7 @@ toolbridge/
 Logs are emitted in JSON format in production and human-readable format in development.
 Every log record includes: `timestamp`, `level`, `logger`, `message`.
 
-Future phases will add: `request_id`, `user_id`, `agent_run_id`, `tool_name`, `latency_ms`, `status`.
+Future phases will add: `request_id`, `user_id`, `tool_name`, `latency_ms`, `status`.
 
 ---
 

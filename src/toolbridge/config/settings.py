@@ -20,7 +20,6 @@ class Settings(BaseSettings):
     Phase 1 fields only.  Future phases will add:
       - GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET  (Phase 6 — OAuth)
       - JWT_SECRET                                (Phase 6 — auth)
-      - ANTHROPIC_API_KEY                         (Phase 8 — agent)
     """
 
     model_config = SettingsConfigDict(

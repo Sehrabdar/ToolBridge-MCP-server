@@ -56,8 +56,8 @@ def create_app() -> FastAPI:
     _app = FastAPI(
         title="ToolBridge",
         description=(
-            "Secure Multi-Tool MCP Server. "
-            "Exposes external tools to autonomous AI agents with "
+            "Secure MCP Server for Authenticated Tool Execution. "
+            "Exposes external tools to MCP-compatible clients with "
             "per-user authentication, authorisation, and audit logging."
         ),
         version="0.1.0",

@@ -1,7 +1,7 @@
 [project]
 name = "toolbridge"
 version = "0.1.0"
-description = "Secure Multi-Tool MCP Server — Phase 1: Project Foundation"
+description = "ToolBridge — Secure MCP Server for Authenticated Tool Execution"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
