@@ -45,7 +45,7 @@ class TestSettingsValidation:
         with pytest.raises(ValidationError):
             Settings(
                 database_url="postgresql+asyncpg://u:p@localhost/db",
-                app_env="unknown",  # type: ignore[arg-type], 
+                app_env="unknown",  # type: ignore[arg-type],
                 github_token="test-token"
             )
 
@@ -54,7 +54,7 @@ class TestSettingsValidation:
         with pytest.raises(ValidationError):
             Settings(
                 database_url="postgresql+asyncpg://u:p@localhost/db",
-                log_level="VERBOSE",  # type: ignore[arg-type], 
+                log_level="VERBOSE",  # type: ignore[arg-type],
                 github_token="test-token"
             )
 
