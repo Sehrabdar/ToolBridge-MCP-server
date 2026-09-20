@@ -17,7 +17,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Typed application settings loaded from environment variables.
 
-    Phase 1 fields only.  Future phases will add:
+    Phase 1 + Phase 3 fields.  Future phases will add:
       - GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET  (Phase 6 — OAuth)
       - JWT_SECRET                                (Phase 6 — auth)
     """
@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # Database
     # ------------------------------------------------------------------ #
     database_url: str  # Required — e.g. postgresql+asyncpg://user:pass@host/db
+
+    # ------------------------------------------------------------------ #
+    # GitHub (Phase 3 — service-level PAT for tool integrations)
+    # ------------------------------------------------------------------ #
+    github_token: str  # Required — fine-grained PAT, public-repo read-only scope
 
     # ------------------------------------------------------------------ #
     # Validators
@@ -68,6 +73,17 @@ class Settings(BaseSettings):
                 "postgres://", "postgresql+asyncpg://", 1
             )
         return url
+
+    @field_validator("github_token")
+    @classmethod
+    def validate_github_token(cls, v: str) -> str:
+        """Ensure GITHUB_TOKEN looks like a real token, not a placeholder."""
+        v = v.strip()
+        if not v or v == "githubpattokenhere":
+            raise ValueError(
+                "GITHUB_TOKEN is not set to a real value — check your .env file"
+            )
+        return v
 
 
 @functools.lru_cache(maxsize=1)

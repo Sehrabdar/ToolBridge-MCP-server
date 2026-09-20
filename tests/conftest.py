@@ -15,7 +15,7 @@ from httpx import ASGITransport, AsyncClient
 # ---------------------------------------------------------------------------
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://toolbridge:toolbridge@localhost:5432/toolbridge_test",
+    "postgresql+asyncpg://toolbridge:toolbridge@localhost:5433/toolbridge_test",
 )
 
 

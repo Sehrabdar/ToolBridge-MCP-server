@@ -30,21 +30,23 @@ class TestSettingsValidation:
 
     def test_missing_database_url_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """DATABASE_URL is required; omitting it must raise ValidationError."""
+        monkeypatch.setenv("GITHUB_TOKEN", "test-token")
         monkeypatch.delenv("DATABASE_URL", raising=False)
         with pytest.raises(ValidationError, match="database_url"):
-            Settings()  # type: ignore[call-arg]  # reads from environment
+            Settings(_env_file=None)  # type: ignore[call-arg]  # reads from environment
 
     def test_invalid_database_url_raises(self) -> None:
         """Non-PostgreSQL DATABASE_URL must be rejected."""
         with pytest.raises(ValidationError):
-            Settings(database_url="sqlite:///local.db")
+            Settings(database_url="sqlite:///local.db", github_token="test-token")
 
     def test_invalid_app_env_raises(self) -> None:
         """APP_ENV must be one of the allowed literals."""
         with pytest.raises(ValidationError):
             Settings(
                 database_url="postgresql+asyncpg://u:p@localhost/db",
-                app_env="unknown",  # type: ignore[arg-type]
+                app_env="unknown",  # type: ignore[arg-type], 
+                github_token="test-token"
             )
 
     def test_invalid_log_level_raises(self) -> None:
@@ -52,7 +54,8 @@ class TestSettingsValidation:
         with pytest.raises(ValidationError):
             Settings(
                 database_url="postgresql+asyncpg://u:p@localhost/db",
-                log_level="VERBOSE",  # type: ignore[arg-type]
+                log_level="VERBOSE",  # type: ignore[arg-type], 
+                github_token="test-token"
             )
 
 
