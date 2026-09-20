@@ -1,6 +1,9 @@
 from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel
 
+from toolbridge.config.settings import get_settings
+from toolbridge.github.client import GitHubClient
+
 
 class RepositoryResult(BaseModel):
     name: str
@@ -36,9 +39,23 @@ mcp = MCPServer("toolbridge")
 
 
 @mcp.tool()
-def search_repositories(query: str) -> SearchRepositoriesResult:
+async def search_repositories(query: str) -> SearchRepositoriesResult:
     """Search Github repositories by keyword query"""
-    return SearchRepositoriesResult(query=query, results=[])
+    settings = get_settings()
+    client = GitHubClient(token=settings.github_token)
+    try:
+        raw_results = await client.search_repositories(query)
+    finally:
+        await client.close()
+    results = [
+        RepositoryResult(
+            name=item["full_name"],
+            url=item["html_url"],
+            description=item.get("description"),
+        )
+        for item in raw_results
+    ]
+    return SearchRepositoriesResult(query=query, results=results)
 
 
 if __name__ == "__main__":
