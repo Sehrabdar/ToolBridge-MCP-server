@@ -9,19 +9,26 @@ from toolbridge.config.settings import Settings, get_settings
 
 
 class TestSettingsDefaults:
-    """Test that default values are applied correctly."""
-
     def test_app_env_defaults_to_development(self) -> None:
-        s = Settings(database_url="postgresql+asyncpg://u:p@localhost/db")
+        s = Settings(
+            database_url="postgresql+asyncpg://u:p@localhost/db",
+            github_token="test-token",
+        )
         assert s.app_env == "development"
 
     def test_log_level_defaults_to_info(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("LOG_LEVEL", raising=False)
-        s = Settings(database_url="postgresql+asyncpg://u:p@localhost/db")
+        s = Settings(
+            database_url="postgresql+asyncpg://u:p@localhost/db",
+            github_token="test-token",
+        )
         assert s.log_level == "INFO"
 
     def test_is_production_false_by_default(self) -> None:
-        s = Settings(database_url="postgresql+asyncpg://u:p@localhost/db")
+        s = Settings(
+            database_url="postgresql+asyncpg://u:p@localhost/db",
+            github_token="test-token",
+        )
         assert s.is_production is False
 
 
@@ -45,8 +52,8 @@ class TestSettingsValidation:
         with pytest.raises(ValidationError):
             Settings(
                 database_url="postgresql+asyncpg://u:p@localhost/db",
-                app_env="unknown",  # type: ignore[arg-type],
-                github_token="test-token"
+                app_env="unknown",  # type: ignore[arg-type]
+                github_token="test-token",
             )
 
     def test_invalid_log_level_raises(self) -> None:
@@ -54,18 +61,17 @@ class TestSettingsValidation:
         with pytest.raises(ValidationError):
             Settings(
                 database_url="postgresql+asyncpg://u:p@localhost/db",
-                log_level="VERBOSE",  # type: ignore[arg-type],
-                github_token="test-token"
+                log_level="VERBOSE",  # type: ignore[arg-type]
+                github_token="test-token",
             )
 
 
 class TestSettingsValid:
-    """Test valid configuration combinations."""
-
     def test_production_env(self) -> None:
         s = Settings(
             database_url="postgresql+asyncpg://u:p@localhost/db",
             app_env="production",
+            github_token="test-token",
         )
         assert s.is_production is True
 
@@ -73,23 +79,27 @@ class TestSettingsValid:
         s = Settings(
             database_url="postgresql+asyncpg://u:p@localhost/db",
             app_env="staging",
+            github_token="test-token",
         )
         assert s.is_production is False
 
     def test_async_database_url_normalisation_postgresql(self) -> None:
-        """postgresql:// should be rewritten to use asyncpg driver."""
-        s = Settings(database_url="postgresql://u:p@localhost/db")
+        s = Settings(
+            database_url="postgresql://u:p@localhost/db",
+            github_token="test-token",
+        )
         assert s.async_database_url.startswith("postgresql+asyncpg://")
 
     def test_async_database_url_normalisation_postgres(self) -> None:
-        """postgres:// (Heroku style) should be rewritten to use asyncpg driver."""
-        s = Settings(database_url="postgres://u:p@localhost/db")
+        s = Settings(
+            database_url="postgres://u:p@localhost/db",
+            github_token="test-token",
+        )
         assert s.async_database_url.startswith("postgresql+asyncpg://")
 
     def test_async_database_url_already_asyncpg(self) -> None:
-        """postgresql+asyncpg:// should pass through unchanged."""
         url = "postgresql+asyncpg://u:p@localhost/db"
-        s = Settings(database_url=url)
+        s = Settings(database_url=url, github_token="test-token")
         assert s.async_database_url == url
 
 

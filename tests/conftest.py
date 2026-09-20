@@ -28,6 +28,7 @@ def _set_test_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None
     fresh settings object derived from the patched environment.
     """
     monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
+    monkeypatch.setenv("GITHUB_TOKEN", "test-token")
     monkeypatch.setenv("APP_ENV", "development")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
 

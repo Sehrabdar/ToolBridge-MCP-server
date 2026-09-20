@@ -80,9 +80,7 @@ class Settings(BaseSettings):
         """Ensure GITHUB_TOKEN looks like a real token, not a placeholder."""
         v = v.strip()
         if not v or v == "githubpattokenhere":
-            raise ValueError(
-                "GITHUB_TOKEN is not set to a real value — check your .env file"
-            )
+            raise ValueError("GITHUB_TOKEN is not set to a real value — check your .env file")
         return v
 
 
