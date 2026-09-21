@@ -1,14 +1,40 @@
+import httpx
 import pytest
+import respx
 
 from mcp import Client
 from toolbridge.mcp.server import mcp
 
 
 @pytest.mark.anyio
-async def test_search_repositories_return_structured_response() -> None:
+@respx.mock
+async def test_search_repositories_returns_structured_response() -> None:
+    respx.get("https://api.github.com/search/repositories").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "full_name": "org/repo",
+                        "html_url": "https://github.com/org/repo",
+                        "description": "A test repo",
+                    }
+                ]
+            },
+        )
+    )
     async with Client(mcp, raise_exceptions=True) as client:
         result = await client.call_tool("search_repositories", {"query": "fastapi"})
-        assert result.structured_content == {"query": "fastapi", "results": []}
+        assert result.structured_content == {
+            "query": "fastapi",
+            "results": [
+                {
+                    "name": "org/repo",
+                    "url": "https://github.com/org/repo",
+                    "description": "A test repo",
+                }
+            ],
+        }
 
 
 @pytest.mark.anyio
