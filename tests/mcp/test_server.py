@@ -38,10 +38,34 @@ async def test_search_repositories_returns_structured_response() -> None:
 
 
 @pytest.mark.anyio
+@respx.mock
 async def test_list_issues_returns_structured_response() -> None:
+    respx.get("https://api.github.com/repos/org/repo/issues").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {
+                    "number": 42,
+                    "title": "Something is broken",
+                    "state": "open",
+                    "html_url": "https://github.com/org/repo/issues/42",
+                }
+            ],
+        )
+    )
     async with Client(mcp, raise_exceptions=True) as client:
         result = await client.call_tool("list_issues", {"repo": "org/repo"})
-        assert result.structured_content == {"repo": "org/repo", "issues": []}
+        assert result.structured_content == {
+            "repo": "org/repo",
+            "issues": [
+                {
+                    "number": 42,
+                    "title": "Something is broken",
+                    "state": "open",
+                    "url": "https://github.com/org/repo/issues/42",
+                }
+            ],
+        }
 
 
 @pytest.mark.anyio

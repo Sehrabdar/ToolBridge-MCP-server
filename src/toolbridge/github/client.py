@@ -9,6 +9,13 @@ class GitHubRepository(TypedDict):
     description: str | None
 
 
+class GitHubIssue(TypedDict):
+    number: int
+    title: str
+    state: str
+    html_url: str
+
+
 class GitHubClientError(Exception):
     """Base exception for Github client errors"""
 
@@ -50,3 +57,32 @@ class GitHubClient:
         data: dict[str, Any] = response.json()
         items: list[GitHubRepository] = data["items"]
         return items
+
+    async def list_issues(self, repo: str, state: str = "open") -> list[GitHubIssue]:
+        """List issues for a repo excluding pull requests.
+
+        GitHub's REST API returns pull requests as part of the issues
+        endpoint (a PR is technically a kind of issue in their data model).
+        Each raw item includes a "pull_request" key only if it's actually
+        a PR — we filter those out so this method returns genuine issues
+        only, matching what the tool name promises callers.
+        """
+        response = await self._client.get(f"/repos/{repo}/issues", params={"state": state})
+        if response.status_code == 404:
+            raise GitHubNotFoundError(f"Repository not found: {repo}")
+        if response.status_code in (401, 403):
+            raise GitHubAuthError(f"GitHub Auth failed: {response.text}")
+        if response.status_code == 429:
+            raise GitHubRateLimitError("GitHub rate limit exceeded.")
+        response.raise_for_status()
+        data: list[dict[str, Any]] = response.json()
+        return [
+            {
+                "number": item["number"],
+                "title": item["title"],
+                "state": item["state"],
+                "html_url": item["html_url"],
+            }
+            for item in data
+            if "pull_request" not in item
+        ]

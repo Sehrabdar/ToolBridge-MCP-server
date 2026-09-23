@@ -17,7 +17,7 @@ class SearchRepositoriesResult(BaseModel):
 
 
 class IssueResult(BaseModel):
-    name: str
+    number: int
     title: str
     state: str
     url: str
@@ -63,9 +63,21 @@ if __name__ == "__main__":
 
 
 @mcp.tool()
-def list_issues(repo: str, state: str = "open") -> ListIssuesResponse:
+async def list_issues(repo: str, state: str = "open") -> ListIssuesResponse:
     """List issues for a GitHub repository, optionally filtered by state (open/closed/all)."""
-    return ListIssuesResponse(repo=repo, issues=[])
+    settings = get_settings()
+    client = GitHubClient(token=settings.github_token)
+    try:
+        raw_issues = await client.list_issues(repo, state=state)
+    finally:
+        await client.close()
+    issues = [
+        IssueResult(
+            number=item["number"], title=item["title"], state=item["state"], url=item["html_url"]
+        )
+        for item in raw_issues
+    ]
+    return ListIssuesResponse(repo=repo, issues=issues)
 
 
 @mcp.tool()
