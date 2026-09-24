@@ -69,20 +69,6 @@ async def test_list_issues_returns_structured_response() -> None:
 
 
 @pytest.mark.anyio
-async def test_get_file_content_returns_structured_response() -> None:
-    async with Client(mcp, raise_exceptions=True) as client:
-        result = await client.call_tool(
-            "get_file_content", {"repo": "org/repo", "path": "README.md"}
-        )
-        assert result.structured_content == {
-            "repo": "org/repo",
-            "path": "README.md",
-            "content": "",
-            "encoding": "utf-8",
-        }
-
-
-@pytest.mark.anyio
 async def test_tools_are_discoverable_with_schemas() -> None:
     async with Client(mcp, raise_exceptions=True) as client:
         tools = await client.list_tools()
@@ -90,5 +76,29 @@ async def test_tools_are_discoverable_with_schemas() -> None:
         assert tool_names == {
             "search_repositories",
             "list_issues",
-            "get_file_content",
+            "get_file_contents",
+        }
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_get_file_contents_returns_structured_response() -> None:
+    import base64
+
+    encoded = base64.b64encode(b"# Hello").decode("ascii")
+    respx.get("https://api.github.com/repos/org/repo/contents/README.md").mock(
+        return_value=httpx.Response(
+            200,
+            json={"path": "README.md", "content": encoded, "encoding": "base64"},
+        )
+    )
+    async with Client(mcp, raise_exceptions=True) as client:
+        result = await client.call_tool(
+            "get_file_contents", {"repo": "org/repo", "path": "README.md"}
+        )
+        assert result.structured_content == {
+            "repo": "org/repo",
+            "path": "README.md",
+            "content": "# Hello",
+            "encoding": "utf-8",
         }

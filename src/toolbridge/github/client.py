@@ -1,3 +1,4 @@
+import base64
 from typing import Any, TypedDict
 
 import httpx
@@ -14,6 +15,12 @@ class GitHubIssue(TypedDict):
     title: str
     state: str
     html_url: str
+
+
+class GitHubFileContent(TypedDict):
+    path: str
+    content: str
+    encoding: str
 
 
 class GitHubClientError(Exception):
@@ -86,3 +93,26 @@ class GitHubClient:
             for item in data
             if "pull_request" not in item
         ]
+
+    async def get_file_contents(self, repo: str, path: str) -> GitHubFileContent:
+        response = await self._client.get(f"/repos/{repo}/contents/{path}")
+        if response.status_code == 404:
+            raise GitHubNotFoundError(f"File not found: {repo}/{path}")
+        if response.status_code in (401, 403):
+            raise GitHubAuthError(f"GitHub auth failed: {response.text}")
+        if response.status_code == 429:
+            raise GitHubRateLimitError("GitHub rate limit exceeded")
+        response.raise_for_status()
+        data: dict[str, Any] = response.json()
+
+        if isinstance(data, list):
+            raise GitHubClientError(f"{path} is a directory, not a file")
+
+        raw_content = data["content"]
+        decoded = base64.b64decode(raw_content).decode("utf-8")
+
+        return {
+            "path": data["path"],
+            "content": decoded,
+            "encoding": "utf-8",
+        }

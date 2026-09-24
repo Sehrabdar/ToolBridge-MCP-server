@@ -73,7 +73,10 @@ async def list_issues(repo: str, state: str = "open") -> ListIssuesResponse:
         await client.close()
     issues = [
         IssueResult(
-            number=item["number"], title=item["title"], state=item["state"], url=item["html_url"]
+            number=item["number"],
+            title=item["title"],
+            state=item["state"],
+            url=item["html_url"],
         )
         for item in raw_issues
     ]
@@ -81,6 +84,18 @@ async def list_issues(repo: str, state: str = "open") -> ListIssuesResponse:
 
 
 @mcp.tool()
-def get_file_content(repo: str, path: str) -> FileContentsResponse:
+async def get_file_contents(repo: str, path: str) -> FileContentsResponse:
     """Retrieve the contents of a file from a GitHub repository."""
-    return FileContentsResponse(repo=repo, path=path, content="", encoding="utf-8")
+    settings = get_settings()
+    client = GitHubClient(token=settings.github_token)
+    try:
+        result = await client.get_file_contents(repo, path)
+    finally:
+        await client.close()
+
+    return FileContentsResponse(
+        repo=repo,
+        path=result["path"],
+        content=result["content"],
+        encoding=result["encoding"],
+    )

@@ -5,6 +5,7 @@ import respx
 from toolbridge.github.client import (
     GitHubAuthError,
     GitHubClient,
+    GitHubClientError,
     GitHubNotFoundError,
     GitHubRateLimitError,
 )
@@ -99,5 +100,61 @@ async def test_list_issues_raises_not_found_on_404() -> None:
     try:
         with pytest.raises(GitHubNotFoundError):
             await client.list_issues("org/nonexistent")
+    finally:
+        await client.close()
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_get_file_contents_decodes_base64() -> None:
+    import base64
+
+    encoded = base64.b64encode(b"print('hello')").decode("ascii")
+    respx.get("https://api.github.com/repos/org/repo/contents/main.py").mock(
+        return_value=httpx.Response(
+            200,
+            json={"path": "main.py", "content": encoded, "encoding": "base64"},
+        )
+    )
+    client = GitHubClient(token="fake-token")
+    try:
+        result = await client.get_file_contents("org/repo", "main.py")
+    finally:
+        await client.close()
+
+    assert result == {
+        "path": "main.py",
+        "content": "print('hello')",
+        "encoding": "utf-8",
+    }
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_get_file_contents_raises_not_found_on_404() -> None:
+    respx.get("https://api.github.com/repos/org/repo/contents/missing.py").mock(
+        return_value=httpx.Response(404, json={"message": "Not Found"})
+    )
+    client = GitHubClient(token="fake-token")
+    try:
+        with pytest.raises(GitHubNotFoundError):
+            await client.get_file_contents("org/repo", "missing.py")
+    finally:
+        await client.close()
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_get_file_contents_raises_on_directory_path() -> None:
+    respx.get("https://api.github.com/repos/org/repo/contents/src").mock(
+        return_value=httpx.Response(
+            200,
+            json=[{"path": "src/main.py", "type": "file"}],  # directory listing, not a file
+        )
+    )
+    client = GitHubClient(token="fake-token")
+    try:
+        with pytest.raises(GitHubClientError, match="directory"):
+            await client.get_file_contents("org/repo", "src")
     finally:
         await client.close()
