@@ -40,8 +40,8 @@ The server combines two concerns, kept deliberately separate:
 | **Phase 0** | Architecture & Requirements | ✅ COMPLETE |
 | **Phase 1** | Project Foundation | ✅ COMPLETE |
 | **Phase 2** | MCP Server Core | ✅ COMPLETE |
-| Phase 3 | GitHub Tool Integrations | ⏳ NEXT |
-| Phase 4 | MCP Transport & Protocol | ⏳ |
+| **Phase 3** | GitHub Tool Integrations | ✅ COMPLETE |
+| Phase 4 | MCP Transport & Protocol | ⏳ NEXT |
 | Phase 5 | Authentication | ⏳ |
 | Phase 6 | Authorization & Permissions | ⏳ |
 | Phase 7 | Secure Credential Management | ⏳ |
@@ -57,7 +57,7 @@ The server combines two concerns, kept deliberately separate:
 
 ## Technology Decisions
 
-### Current Implementation (Phase 1 & Phase 2)
+### Current Implementation (Phases 1–3)
 
 | Technology | Purpose | Status |
 |---|---|---|
@@ -76,14 +76,57 @@ The server combines two concerns, kept deliberately separate:
 | **mypy** | Static type checking | ✅ Implemented |
 | **GitHub Actions** | CI pipeline | ✅ Implemented |
 | **Official Python MCP SDK** (`mcp` 2.x) | MCP server primitives, tool registration, in-process client testing | ✅ Implemented (Phase 2) |
+| **httpx** | Async HTTP client for GitHub REST API calls | ✅ Implemented (Phase 3) |
+| **respx** | httpx mock library for unit-testing GitHub client | ✅ Implemented (Phase 3) |
+| **GitHub REST API** | External tool target (`search_repositories`, `list_issues`, `get_file_contents`) | ✅ Implemented (Phase 3) |
 
 ### Future Phases (not yet implemented)
 
 | Technology | Purpose | Phase |
 |---|---|---|
-| **GitHub REST API** | External tool target (`search_repositories`, `list_issues`, `get_file_content`) | Phase 3 |
 | **GitHub OAuth** | User identity via GitHub authorization | Phase 5 |
 | **JWT** | Short-lived session tokens for MCP requests | Phase 5 |
+
+---
+
+## Phase 3 — GitHub Tool Integrations — ✅ COMPLETE
+
+Implemented the `GitHubClient` — a typed, async HTTP client wrapping the GitHub REST API — and wired all three MCP tools to it. Tools now make real API calls and return live data. Phase 3 raises the test count from 4 to 11 passing tests while maintaining 0 Ruff issues and 0 mypy issues.
+
+### What was delivered
+
+| Item | Detail |
+|---|---|
+| GitHub client | `src/toolbridge/github/client.py` — `GitHubClient` with typed `httpx.AsyncClient` |
+| `search_repositories` | Issues `GET /search/repositories?q=<query>`, returns `list[GitHubRepository]` |
+| `list_issues` | Issues `GET /repos/{repo}/issues?state=<state>`, filters out pull requests |
+| `get_file_contents` | Issues `GET /repos/{repo}/contents/{path}`, Base64-decodes file content |
+| Typed responses | `GitHubRepository`, `GitHubIssue`, `GitHubFileContent` TypedDicts |
+| Error hierarchy | `GitHubClientError` → `GitHubNotFoundError`, `GitHubRateLimitError`, `GitHubAuthError` |
+| MCP tool wiring | All three tools in `server.py` instantiate `GitHubClient` and delegate to it |
+| Test suite | `tests/github/test_client.py` — 7 tests using `respx` HTTP mocks |
+| Updated MCP tests | `tests/mcp/test_server.py` — 4 tests now use `respx` mocks, verify live structured output |
+| Ruff | 0 issues |
+| mypy | 0 issues |
+
+#### Pull Request Filtering in `list_issues`
+
+GitHub's REST API returns pull requests as part of the issues endpoint (a PR is technically a kind of issue in their data model). Each raw item includes a `"pull_request"` key only if it is actually a PR. `GitHubClient.list_issues` filters those out so the tool returns genuine issues only, matching what the tool name promises callers.
+
+#### Base64 Decoding in `get_file_contents`
+
+GitHub's Contents API returns file content as a Base64-encoded string. `GitHubClient.get_file_contents` decodes it to a UTF-8 string before returning, so callers receive human-readable text without needing to know about the encoding layer. If the target path is a directory (response is a JSON array rather than an object), the client raises `GitHubClientError` with a clear `"directory"` message.
+
+#### Error Handling
+
+All three client methods map GitHub HTTP status codes to typed exceptions before surfacing them:
+
+| HTTP Status | Exception |
+|---|---|
+| 401, 403 | `GitHubAuthError` |
+| 404 | `GitHubNotFoundError` |
+| 429 | `GitHubRateLimitError` |
+| Other 4xx/5xx | `httpx.HTTPStatusError` (via `raise_for_status`) |
 
 ---
 
@@ -103,16 +146,13 @@ passing with 0 issues.
 | MCP server instance | `mcp = MCPServer("toolbridge")` in `src/toolbridge/mcp/server.py` |
 | Tool: `search_repositories` | Input: `query: str` → Output: `SearchRepositoriesResult` |
 | Tool: `list_issues` | Input: `repo: str`, `state: str` → Output: `ListIssuesResponse` |
-| Tool: `get_file_content` | Input: `repo: str`, `path: str` → Output: `FileContentsResponse` |
+| Tool: `get_file_contents` | Input: `repo: str`, `path: str` → Output: `FileContentsResponse` |
 | Pydantic output schemas | `RepositoryResult`, `SearchRepositoriesResult`, `IssueResult`, `ListIssuesResponse`, `FileContentsResponse` |
-| Test: tool invocation × 3 | `test_search_repositories_return_structured_response`, `test_list_issues_returns_structured_response`, `test_get_file_content_returns_structured_response` |
+| Test: tool invocation × 3 | `test_search_repositories_returns_structured_response`, `test_list_issues_returns_structured_response`, `test_get_file_contents_returns_structured_response` |
 | Test: tool discovery | `test_tools_are_discoverable_with_schemas` — asserts all three tools are listed |
 | Test suite | `tests/mcp/test_server.py` — 4 tests, 0 failures |
 | Ruff | 0 issues |
 | mypy | 0 issues |
-
-All three tools currently return empty stub results (no GitHub REST API calls).
-GitHub integration is Phase 3.
 
 #### MCP SDK Version Drift & Migration
 
@@ -166,18 +206,17 @@ is tracked as a follow-on hygiene item.
 
 ## MCP Tools
 
-Three read-oriented tools are registered on the MCP server as of Phase 2:
+Three read-oriented tools are registered on the MCP server as of Phase 3:
 
 ```
 search_repositories(query)              → SearchRepositoriesResult
 list_issues(repo, state="open")         → ListIssuesResponse
-get_file_content(repo, path)            → FileContentsResponse
+get_file_contents(repo, path)           → FileContentsResponse
 ```
 
-These tools are **discoverable** (verified by `test_tools_are_discoverable_with_schemas`)
-and return **schema-driven structured output** (verified by the three invocation
-tests). They currently return empty stub results; real GitHub REST API integration
-is Phase 3.
+These tools are **discoverable** (verified by `test_tools_are_discoverable_with_schemas`),
+return **schema-driven structured output** (verified by the three invocation tests),
+and **make real GitHub REST API calls** via `GitHubClient` (Phase 3).
 
 ---
 
@@ -195,13 +234,14 @@ audit_log (id, user_id, tool_name, request_payload, response_status, latency_ms,
 
 ---
 
-## Getting Started (Phase 1 & Phase 2)
+## Getting Started (Phases 1–3)
 
 ### Prerequisites
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
 - Docker & Docker Compose
+- A GitHub personal access token (for tool execution)
 
 ### Setup
 
@@ -212,7 +252,7 @@ cd toolbridge
 
 # Copy environment configuration
 cp .env.example .env
-# Edit .env if needed (defaults work with docker compose)
+# Edit .env — set GITHUB_TOKEN to your GitHub personal access token
 
 # Install dependencies
 uv sync
@@ -233,6 +273,12 @@ curl http://localhost:8000/health
 ```bash
 # Unit tests (no external services required)
 uv run pytest tests/unit/
+
+# GitHub client tests (uses respx HTTP mocks — no real API calls)
+uv run pytest tests/github/
+
+# MCP server tests (uses respx HTTP mocks — no real API calls)
+uv run pytest tests/mcp/
 
 # Integration tests (requires PostgreSQL from docker compose up -d)
 uv run pytest tests/integration/ -m integration
@@ -277,12 +323,14 @@ toolbridge/
 │       ├── logging/      # Structured logging (structlog)
 │       ├── db/           # Async SQLAlchemy engine + health check
 │       ├── server/       # FastAPI application + /health endpoint
-│       └── mcp/          # MCP server instance + tool definitions (Phase 2)
+│       ├── github/       # GitHub REST API client + typed responses (Phase 3)
+│       └── mcp/          # MCP server instance + tool definitions (Phase 2–3)
 │
 ├── tests/
 │   ├── unit/             # Tests with no external service dependencies
 │   ├── integration/      # Tests requiring PostgreSQL
-│   └── mcp/              # In-process MCP server tests (Phase 2)
+│   ├── mcp/              # In-process MCP server tests (Phase 2–3)
+│   └── github/           # GitHub client unit tests with respx mocks (Phase 3)
 │
 ├── migrations/           # Alembic migration scripts
 ├── docs/                 # Architecture documentation
@@ -329,3 +377,12 @@ This keeps the implementation aligned with the resolved MCP major version. Const
 the `pyproject.toml` dependency to `mcp>=2,<3` is tracked as a follow-on step to
 prevent an uncontrolled future major-version upgrade from introducing another
 breaking API change.
+
+### GitHub Client Design (Phase 3)
+
+`GitHubClient` is a thin, typed wrapper around `httpx.AsyncClient`. Each method maps
+to a single GitHub REST API endpoint and converts HTTP error codes into a typed
+exception hierarchy before they propagate to the MCP tool layer. This keeps error
+handling logic out of the MCP tool handlers themselves and makes the client testable
+in isolation with `respx` HTTP mocks — no real network calls are required by any
+unit test.
