@@ -6,7 +6,7 @@ This module defines the minimal FastAPI application.  In Phase 1 the only
 route is ``GET /health``.
 
 Future phases will add:
-  - MCP Streamable HTTP transport endpoints   (Phase 2)
+  - MCP Streamable HTTP transport endpoints   (Phase 4)
   - GitHub OAuth callback routes              (Phase 6)
 
 Do NOT add OAuth or MCP routes here until those phases are implemented.
@@ -15,7 +15,7 @@ Do NOT add OAuth or MCP routes here until those phases are implemented.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse
 from toolbridge.config import get_settings
 from toolbridge.db.health import check_db_health
 from toolbridge.logging import configure_logging, get_logger
+from toolbridge.mcp.server import mcp
 
 logger = get_logger(__name__)
 
@@ -40,7 +41,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app_env=settings.app_env,
         log_level=settings.log_level,
     )
-    yield
+    async with AsyncExitStack() as stack:
+        await stack.enter_async_context(mcp.session_manager.run())
+        yield
     logger.info("toolbridge.stopped")
 
 
@@ -94,6 +97,12 @@ def create_app() -> FastAPI:
                 "db": "ok" if db_ok else "degraded",
             }
         )
+
+    # ------------------------------------------------------------------ #
+    # MCP — Phase 4 (Streamable HTTP transport)
+    # ------------------------------------------------------------------ #
+
+    _app.mount("/", mcp.streamable_http_app())
 
     return _app
 
