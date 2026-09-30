@@ -41,8 +41,8 @@ The server combines two concerns, kept deliberately separate:
 | **Phase 1** | Project Foundation | ✅ COMPLETE |
 | **Phase 2** | MCP Server Core | ✅ COMPLETE |
 | **Phase 3** | GitHub Tool Integrations | ✅ COMPLETE |
-| Phase 4 | MCP Transport & Protocol | ⏳ NEXT |
-| Phase 5 | Authentication | ⏳ |
+| **Phase 4** | MCP Transport & Protocol | ✅ COMPLETE |
+| Phase 5 | Authentication | ⏳ NEXT |
 | Phase 6 | Authorization & Permissions | ⏳ |
 | Phase 7 | Secure Credential Management | ⏳ |
 | Phase 8 | Policy Engine | ⏳ |
@@ -57,13 +57,13 @@ The server combines two concerns, kept deliberately separate:
 
 ## Technology Decisions
 
-### Current Implementation (Phases 1–3)
+### Current Implementation (Phases 1–4)
 
 | Technology | Purpose | Status |
 |---|---|---|
 | **Python 3.12** | Primary language | ✅ Implemented |
 | **uv** | Dependency management & virtual environments | ✅ Implemented |
-| **FastAPI** | Web framework (`/health` endpoint; future auth layer) | ✅ Implemented |
+| **FastAPI** | Web framework (MCP HTTP transport, `/health` endpoint) | ✅ Implemented |
 | **pydantic-settings** | Typed configuration from environment variables | ✅ Implemented |
 | **structlog** | Structured application logging | ✅ Implemented |
 | **SQLAlchemy (async)** | Async ORM / database connectivity | ✅ Implemented |
@@ -86,6 +86,21 @@ The server combines two concerns, kept deliberately separate:
 |---|---|---|
 | **GitHub OAuth** | User identity via GitHub authorization | Phase 5 |
 | **JWT** | Short-lived session tokens for MCP requests | Phase 5 |
+
+---
+
+## Phase 4 — MCP Transport & Protocol — ✅ COMPLETE
+
+Integrated the MCP Streamable HTTP transport into the FastAPI application, enabling real MCP clients to connect over the network. The server now fully supports end-to-end tool execution over HTTP, distinct from the in-process testing implemented in Phase 2.
+
+### What was delivered
+
+| Item | Detail |
+|---|---|
+| HTTP Transport Mount | `_app.mount("/", mcp.streamable_http_app())` in `src/toolbridge/server/app.py` |
+| Session Management | Added `lifespan` handler to properly manage `mcp.session_manager.run()` |
+| E2E Transport Tests | `tests/mcp/test_http_transport.py` — spins up real Uvicorn server and tests with `mcp.Client` |
+| Test suite updates | 4 new HTTP transport tests, covering tool discovery and error handling |
 
 ---
 
@@ -234,7 +249,7 @@ audit_log (id, user_id, tool_name, request_payload, response_status, latency_ms,
 
 ---
 
-## Getting Started (Phases 1–3)
+## Getting Started (Phases 1–4)
 
 ### Prerequisites
 
@@ -322,14 +337,14 @@ toolbridge/
 │       ├── config/       # Typed settings (pydantic-settings)
 │       ├── logging/      # Structured logging (structlog)
 │       ├── db/           # Async SQLAlchemy engine + health check
-│       ├── server/       # FastAPI application + /health endpoint
+│       ├── server/       # FastAPI application + MCP HTTP transport (Phase 4)
 │       ├── github/       # GitHub REST API client + typed responses (Phase 3)
 │       └── mcp/          # MCP server instance + tool definitions (Phase 2–3)
 │
 ├── tests/
 │   ├── unit/             # Tests with no external service dependencies
 │   ├── integration/      # Tests requiring PostgreSQL
-│   ├── mcp/              # In-process MCP server tests (Phase 2–3)
+│   ├── mcp/              # MCP server and HTTP transport tests (Phase 2–4)
 │   └── github/           # GitHub client unit tests with respx mocks (Phase 3)
 │
 ├── migrations/           # Alembic migration scripts
